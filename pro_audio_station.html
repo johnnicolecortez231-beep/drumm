@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Audio Station - Synth & Drum Pad</title>
+    <style>
+        :root {
+            --bg-main: #0f0f13;
+            --bg-panel: #171721;
+            --bg-surface: #222230;
+            --accent-synth: #ff007f; /* Neon Pink */
+            --accent-drum: #00f3ff;  /* Neon Cyan */
+            --text-main: #f5f5f7;
+            --text-muted: #8e8e93;
+            --border: #2d2d3f;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 15px;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 750px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 15px;
+        }
+
+        header h1 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .section-title {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            display: block;
+            font-weight: 600;
+        }
+
+        /* Oscilloscope Visualizer Window */
+        .visualizer-wrapper {
+            width: 100%;
+            height: 100px;
+            background: #050508;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* Controls Grid Layout Structure */
+        .synth-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+            background: var(--bg-surface);
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .control-group label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        select, input[type="range"] {
+            width: 100%;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 8px;
+            border-radius: 6px;
+            outline: none;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            height: 6px;
+            background: var(--bg-panel);
+            padding: 0;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent-synth);
+            cursor: pointer;
+        }
+
+        /* 1. DRUM PAD GRID ENGINE */
+        .drum-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+
+        .drum-pad {
+            aspect-ratio: 1;
+            background: var(--bg-surface);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.1s ease;
+            user-select: none;
+        }
+
+        .drum-pad:active, .drum-pad.active {
+            background: rgba(0, 243, 255, 0.15);
+            border-color: var(--accent-drum);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.4);
+            transform: scale(0.96);
+        }
+
+        .drum-pad .key-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            background: var(--bg-panel);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
+        .drum-pad .inst-name {
+            font-size: 0.85rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        /* 2. SYNTHESIZER PIANO KEYS ENGINE */
+        .piano-keyboard {
+            display: flex;
+            width: 100%;
+            height: 150px;
+            background: #000;
+            padding: 4px;
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .piano-key {
+            flex: 1;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 0 0 6px 6px;
+            cursor: pointer;
+            position: relative;
+            z-index: 1;
+            transition: background 0.1s;
+        }
+
+        .piano-key:active, .piano-key.active {
+            background: #e5e5e5;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+        }
+
+        .piano-key.black {
+            background: #111;
+            border-color: #000;
+            height: 60%;
+            margin-left: -3.5%;
+            margin-right: -3.5%;
+            z-index: 2;
+        }
+
+        .piano-key.black:active, .piano-key.black.active {
+            background: #333;
+        }
+
+        /* Key trigger note styling dynamically managed */
+        .piano-key:active::after, .piano-key.active::after {
+            content: '';
+            position: absolute;
+            bottom: 8px; left: 10%; right: 10%;
+            height: 4px;
+            background: var(--accent-synth);
+            border-radius: 2px;
+        }
+
+        @media (max-width: 600px) {
+            .drum-grid { grid-template-columns: repeat(2, 1fr); }
+            .piano-keyboard { height: 120px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <header>
+            <h1>PRO AUDIO STATION</h1>
+            <span style="font-family:monospace; font-size:0.8rem; color:var(--accent-drum);">WEB AUDIO NATIVE</span>
+        </header>
+
+        <!-- Oscilloscope Wave Engine Window Viewport -->
+        <div class="visualizer-wrapper">
+            <canvas id="visualizer"></canvas>
+        </div>
+
+        <!-- Synthesizer Signal Wave Parameters Controllers -->
+        <span class="section-title">Synth Engine Control</span>
+        <div class="synth-controls">
+            <div class="control-group">
+                <label>Wave Shape</label>
+                <select id="waveType">
+                    <option value="sine">Sine (Smooth)</option>
+                    <option value="triangle" selected>Triangle (Flute-like)</option>
+                    <option value="square">Square (Retro 8-Bit)</option>
+                    <option value="sawtooth">Sawtooth (Edgy Brass)</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Filter Cutoff (Lowpass)</label>
+                <input type="range" id="filterCutoff" min="100" max="8000" value="2500">
+            </div>
+            <div class="control-group">
+                <label>Release Time (Sustain)</label>
+                <input type="range" id="synthRelease" min="0.1" max="2.0" step="0.1" value="0.4">
+            </div>
+        </div>
+
+        <!-- 16-Pad Architecture Grid System Deck Section -->
+        <span class="section-title">Velocity Drum Matrix</span>
+        <div class="drum-grid" id="drumGrid"></div>
+
+        <!-- 12-Tone Scale Native Chromatic Synth Engine Section -->
+        <span class="section-title">Polyphonic Oscillator Keys</span>
+        <div class="piano-keyboard" id="pianoKeyboard"></div>
+    </div>
+
+    <script>
+        // Central Native Browser Core Web Audio Context Pipeline Initiation
+        let audioCtx = null;
+        let mainFilter = null;
+        let analyser = null;
+
+        function initAudioEngine() {
+            if (audioCtx) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // Lowpass filter configuration matching high fidelity synthesizer structures
+            mainFilter = audioCtx.createBiquadFilter();
+            mainFilter.type = 'lowpass';
+            mainFilter.frequency.setValueAtTime(document.getElementById('filterCutoff').value, audioCtx.currentTime);
+
+            // Analyser Node configuration processing real-time soundbars
+            analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 512;
+
+            // Bridge connection nodes arrays paths out to hardware destination channels
+            mainFilter.connect(analyser);
+            analyser.connect(audioCtx.destination);
+
+            startOscilloscope();
+        }
+
+        // Real-Time Canvas Wave Oscilloscope Engine Rendering Setup Loop
+        const canvas = document.getElementById('visualizer');
+        const canvasCtx = canvas.getContext('2d');
+
+        function startOscilloscope() {
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+
+            function draw() {
+                requestAnimationFrame(draw);
+                analyser.getByteTimeDomainData(dataArray);
+
+                canvasCtx.fillStyle = '#050508';
+                canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+                canvasCtx.lineWidth = 2;
+                canvasCtx.strokeStyle = '#00f3ff';
+                canvasCtx.beginPath();
+
+                let sliceWidth = canvas.width * 1.0 / bufferLength;
+                let x = 0;
+
+                for (let i = 0; i < bufferLength; i++) {
+                    let v = dataArray[i] / 128.0;
+                    let y = v * canvas.height / 2;
+
+                    if (i === 0) canvasCtx.moveTo(x, y);
+                    else canvasCtx.lineTo(x, y);
+
+                    x += sliceWidth;
+                }
+
+                canvasCtx.lineTo(canvas.width, canvas.height / 2);
+                canvasCtx.stroke();
+            }
+            draw();
+        }
+
+        // --- SYNTHESIZER ENGINE ARCHITECTURE ---
+        const waveTypeSelect = document.getElementById('waveType');
+        const filterCutoffInput = document.getElementById('filterCutoff');
+        const synthReleaseInput = document.getElementById('synthRelease');
+
+        filterCutoffInput.addEventListener('input', (e) => {
+            if (mainFilter) mainFilter.frequency.setValueAtTime(e.target.value, audioCtx.currentTime);
+        });
+
+        // Oscillator Tone Trigger Architecture (Polyphonic Structure Generator Map)
+        function triggerSynthTone(frequency) {
+            initAudioEngine();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            osc.type = waveTypeSelect.value;
+            osc.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+
+            // Envelope ADSR Configuration: Rapid Attack & Clean Release Exponential Envelope
+            gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.4, audioCtx.currentTime + 0.02); // Attack
+            
+            const releaseTime = parseFloat(synthReleaseInput.value);
+            gainNode.gain.setValueAtTime(0.4, audioCtx.currentTime + 0.08);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08 + releaseTime); // Release
+
+            osc.connect(gainNode);
+            gainNode.connect(mainFilter);
+
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1 + releaseTime);
+        }
+
+        // --- SYNTHESIZING DRUM SOUND MATH MODULES ---
+        // Creating professional grade drum nodes out of mathematical pure raw signal waves
+        function playKickDrum() {
+            initAudioEngine();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+            // Dynamic exponential sweep mimics a solid physical skin drop kick impact hit
+            osc.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+
+            gain.gain.setValueAtTime(1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+
+            osc.connect(gain); gain.connect(analyser);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.12);
+        }
+
+        function playSnareDrum() {
+            initAudioEngine();
+            // Snares utilize broad white-noise signals mapped with bandpass frequencies
+            const bufferSize = audioCtx.sampleRate * 0.15; // Short burst duration limits
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1; // Pure audio white noise matrix filler
+            }
+
+            const noiseNode = audioCtx.createBufferSource(buffer);
+            noiseNode.buffer = buffer;
+
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'highpass';
+            noiseFilter.frequency.value = 1000;
+
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(0.6, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+
+            noiseNode.connect(noiseFilter);
+            noiseFilter.connect(gain);
+            gain.connect(analyser);
+
+            noiseNode.start(); noiseNode.stop(audioCtx.currentTime + 0.15);
+        }
+
+        function playHiHat(open = false) {
+            initAudioEngine();
+            // Hi-Hats utilize sharp highpassed square frequencies mixed together rapidly
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            const filter = audioCtx.createBiquadFilter();
+
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(10000, audioCtx.currentTime);
+
+            filter.type = 'highpass';
+            filter.frequency.value = 7000;
+
+            const duration = open ? 0.35 : 0.08;
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(analyser);
+
+            osc.start(); osc.stop(audioCtx.currentTime + duration);
+        }
+
+        function playClap() {
+            initAudioEngine();
+            // Claps trigger multiple fast micro-burst spikes overlapping consecutively
+            const duration = 0.12;
+            const bufferSize = audioCtx.sampleRate * duration;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+
+            const noiseNode = audioCtx.createBufferSource(buffer);
+            noiseNode.buffer = buffer;
+
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.value = 1200;
+
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+            // Simulated clapping stutter pattern triggers
+            gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.02);
+            gain.gain.linearRampToValueAtTime(0.4, audioCtx.currentTime + 0.03);
+            gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.06);
+            gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.07);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+            noiseNode.connect(filter); filter.connect(gain); gain.connect(analyser);
+            noiseNode.start(); noiseNode.stop(audioCtx.currentTime + duration);
+        }
+
+        // --- DOM DEPLOYMENT MAPPING ENGINE ---
+        const instruments = [
+            { name: 'KICK', key: '1', action: playKickDrum },
+            { name: 'SNARE', key: '2', action: playSnareDrum },
+            { name: 'CLOSED HAT', key: '3', action: () => playHiHat(false) },
+            { name: 'OPEN HAT', key: '4', action: () => playHiHat(true) },
+            { name: 'CLAP', key: 'Q', action: playClap },
+            { name: 'PERC 1', key: 'W', action: () => triggerSynthTone(880) },
+            { name: 'PERC 2', key: 'E', action: () => triggerSynthTone(1200) },
+            { name: 'COWBELL', key: 'R', action: () => triggerSynthTone(587.33) }
+        ];
+
+        const notes = [
+            { label: 'C4', freq: 261.63, black: false, key: 'A' },
+            { label: 'C#4', freq: 277.18, black: true, key: 'W' },
+            { label: 'D4', freq: 293.66, black: false, key: 'S' },
+            { label: 'D#4', freq: 311.13, black: true, key: 'E' },
+            { label: 'E4', freq: 329.63, black: false, key: 'D' },
+            { label: 'F4', freq: 349.23, black: false, key: 'F' },
+            { label: 'F#4', freq: 369.99, black: true, key: 'T' },
+            { label: 'G4', freq: 392.00, black: false, key: 'G' },
+            { label: 'G#4', freq: 415.30, black: true, key: 'Y' },
+            { label: 'A4', freq: 440.00, black: false, key: 'H' },
+            { label: 'A#4', freq: 466.16, black: true, key: 'U' },
+            { label: 'B4', freq: 493.88, black: false, key: 'J' },
+            { label: 'C5', freq: 523.25, black: false, key: 'K' }
+        ];
+
+        // Building the Drum Pads Elements Interface Grid
+        const drumGrid = document.getElementById('drumGrid');
+        instruments.forEach(inst => {
+            const pad = document.createElement('div');
+            pad.className = 'drum-pad';
+            pad.id = `pad-${inst.key.toLowerCase()}`;
+            pad.innerHTML = `<span class="key-label">${inst.key}</span><span class="inst-name">${inst.name}</span>`;
+            
+            const triggerPad = () => { inst.action(); pad.classList.add('active'); setTimeout(() => pad.classList.remove('active'), 80); };
+            pad.addEventListener('mousedown', triggerPad);
+            pad.addEventListener('touchstart', (e) => { e.preventDefault(); triggerPad(); });
+            drumGrid.appendChild(pad);
+        });
+
+        // Building the Piano Synthesizer Keys Layout
+        const keyboard = document.getElementById('pianoKeyboard');
+        notes.forEach(note => {
+            const keyBtn = document.createElement('div');
+            keyBtn.className = `piano-key ${note.black ? 'black' : ''}`;
+            keyBtn.id = `key-${note.key.toLowerCase()}`;
+            
+            const triggerKey = () => { triggerSynthTone(note.freq); keyBtn.classList.add('active'); setTimeout(() => keyBtn.classList.remove('active'), 100); };
+            keyBtn.addEventListener('mousedown', triggerKey);
+            keyBtn.addEventListener('touchstart', (e) => { e.preventDefault(); triggerKey(); });
+            keyboard.appendChild(keyBtn);
+        });
+
+        // System Hardware Keyboard Listener Map Routing Connectors
+        window.addEventListener('keydown', (e) => {
+            if (e.repeat) return;
+            const k = e.key.toLowerCase();
+            
+            // Route tracking to drum deck triggers
+            const targetPad = instruments.find(i => i.key.toLowerCase() === k);
+            if (targetPad) {
+                const padEl = document.getElementById(`pad-${k}`);
+                if (padEl) { padEl.classList.add('active'); targetPad.action(); setTimeout(() => padEl.classList.remove('active'), 80); }
+            }
+
+            // Route tracking to synthesizer pitch adjustments
+            const targetKey = notes.find(n => n.key.toLowerCase() === k);
+            if (targetKey) {
+                const keyEl = document.getElementById(`key-${k}`);
+                if (keyEl) { keyEl.classList.add('active'); triggerSynthTone(targetKey.freq); setTimeout(() => keyEl.classList.remove('active'), 100); }
+            }
+        });
+    </script>
+</body>
+</html>
